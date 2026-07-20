@@ -1,7 +1,7 @@
 import { formatUnits } from "ethers";
 
 import tokenMetadataService from "../token/tokenMetadataService.js";
-import { getDexTokenInfo } from "../../providers/dexScreenerProvider.js";
+import { getDexTokenInfo } from "../../providers/dexscreenerProvider.js";
 
 class TokenPriceService {
 
