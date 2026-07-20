@@ -1,0 +1,11 @@
+[
+    {
+        "exchange": "binance",
+        "chain": "bsc",
+        "address": "0x8894E0a0c962CB723c1976a4421c95949bE2D4E3",
+        "walletType": "Binance 51",
+        "verified": true,
+        "confidence": 100,
+        "source": "bscscan"
+    }
+]
