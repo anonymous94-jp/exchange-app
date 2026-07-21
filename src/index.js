@@ -7,6 +7,10 @@ import graphBuilderService from "./services/graph/graphBuilderService.js";
 
 dotenv.config();
 
+const RAM_LIMIT_MB = 1100;
+
+let rotating = false;
+
 
 async function main() {
 
@@ -15,7 +19,7 @@ async function main() {
     console.log("Whale Alert Bot Started");
     console.log("================================");
 
-    await graphStorage.loadGraph();
+    // await graphStorage.loadGraph();
 
     graphStorage.scheduleAutoSave(
         60000
@@ -27,67 +31,58 @@ async function main() {
 
 }
 
-function formatRuntime(seconds) {
-
-    const h =
-        Math.floor(seconds / 3600);
-
-    const m =
-        Math.floor((seconds % 3600) / 60);
-
-    return `${h}h ${m}m`;
-
-}
-
 function startMemoryMonitor() {
 
-    setInterval(async() => {
+    setInterval(async () => {
 
         const memory = process.memoryUsage();
-        const info = getMemoryInfo();
-        const summary = graphBuilderService.getSummary();
 
-        console.log("");
-        console.log("========== COLLECTOR STATUS ==========");
+        const rssMb =
+            memory.rss / 1024 / 1024;
 
-        console.log(
-            "Runtime :",
-            formatRuntime(process.uptime())
-        );
+        console.log("========== MEMORY ==========");
 
-        console.log(
-            "Wallets :",
-            summary.walletCount
-        );
+        console.log({
 
-        console.log(
-            "Edges   :",
-            summary.edgeCount
-        );
+            rss:
+                `${Math.round(rssMb)} MB`,
 
-        console.log(
-            "RSS     :",
-            `${Math.round(memory.rss / 1024 / 1024)} MB`
-        );
+            heapUsed:
+                `${Math.round(memory.heapUsed / 1024 / 1024)} MB`,
 
-        console.log(
-            "Heap    :",
-            `${Math.round(memory.heapUsed / 1024 / 1024)} MB / ${Math.round(memory.heapTotal / 1024 / 1024)} MB`
-        );
+            heapTotal:
+                `${Math.round(memory.heapTotal / 1024 / 1024)} MB`
 
-        if (info.exceeded) {
+        });
+
+        if (
+            rssMb >= RAM_LIMIT_MB &&
+            !rotating
+        ) {
+
+            rotating = true;
 
             console.log("");
-            console.log("================================");
-            console.log("RAM LIMIT REACHED");
-            console.log("Saving graph...");
-            console.log("================================");
+            console.log("========== RAM LIMIT ==========");
+            console.log(`RSS: ${Math.round(rssMb)} MB`);
 
-            await graphStorage.saveGraph(true);
+            try {
 
-            console.log("Graph saved.");
+                await graphStorage.rotateSnapshot();
+                console.log("[MemoryMonitor] Rotation completed.");
 
-            process.exit(0);
+            } catch (error) {
+
+                console.error(
+                    "[MemoryMonitor] Rotate failed:",
+                    error
+                );
+
+            } finally {
+
+                rotating = false;
+
+            }
 
         }
 

@@ -8,20 +8,43 @@ import tokenMetadataService from "../token/tokenMetadataService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const GRAPH_PATH = path.join(__dirname, "../../../data/exchangeGraph.json");
+const DATA_DIR =path.join(__dirname, "../../../data");
+const GRAPH_PATH = path.join(DATA_DIR, "exchangeGraph.json");
+const SNAPSHOT_DIR = path.join(DATA_DIR, "snapshots");
+
+function createGraph() {
+
+    return {
+
+        version: 1,
+
+        updatedAt: null,
+
+        wallets: {},
+
+        edges: {}
+
+    };
+
+}
 
 class GraphStorageService {
     constructor() {
 
-        this.graph = {
-            version: 1,
-            updatedAt: null,
-            wallets: {},
-            edges: {}
-        };
+        this.graph = createGraph();
 
         this.dirty = false;
         this.saveInterval = null;
+        this.currentGraphPath = null;
+
+        if (!fs.existsSync(SNAPSHOT_DIR)) {
+
+            fs.mkdirSync(
+                SNAPSHOT_DIR,
+                { recursive: true }
+            );
+
+        }
     }
 
     async loadGraph() {
@@ -51,12 +74,21 @@ class GraphStorageService {
 
         if (!force && !this.dirty) return;
 
+        if (!this.currentGraphPath) {
+
+            this.createNewSnapshot();
+
+        }
+
         try {
             this.graph.updatedAt = new Date().toISOString();
 
-            await fs.ensureDir(path.dirname(GRAPH_PATH));
+            await fs.ensureDir(path.dirname(SNAPSHOT_DIR));
 
-            await fs.writeJson(GRAPH_PATH, this.graph, {
+            // await fs.writeJson(GRAPH_PATH, this.graph, {
+            //     spaces: 2
+            // });
+            await fs.writeJson(this.currentGraphPath, this.graph, {
                 spaces: 2
             });
 
@@ -68,6 +100,89 @@ class GraphStorageService {
         } catch (err) {
             console.error("[GraphStorage] Save error:", err);
         }
+    }
+
+    getSnapshotFileName() {
+
+        const now =
+            new Date();
+
+        const yyyy =
+            now.getFullYear();
+
+        const MM =
+            String(now.getMonth() + 1)
+                .padStart(2, "0");
+
+        const dd =
+            String(now.getDate())
+                .padStart(2, "0");
+
+        const hh =
+            String(now.getHours())
+                .padStart(2, "0");
+
+        const mm =
+            String(now.getMinutes())
+                .padStart(2, "0");
+
+        const ss =
+            String(now.getSeconds())
+                .padStart(2, "0");
+
+        return path.join(
+
+            SNAPSHOT_DIR,
+
+            `exchangeGraph_${yyyy}-${MM}-${dd}_${hh}-${mm}-${ss}.json`
+
+        );
+
+    }
+
+    createNewSnapshot() {
+
+        const file =
+            this.getSnapshotFileName();
+
+        this.currentGraphPath = file;
+
+        console.log(
+            `[Snapshot] New session -> ${file}`
+        );
+
+        return file;
+
+    }
+
+    resetGraph() {
+
+        console.log(
+            "[GraphStorage] Reset graph..."
+        );
+
+        this.graph = createGraph();
+
+        this.dirty = false;
+
+        this.currentGraphPath = null;
+
+    }
+
+    async rotateSnapshot() {
+
+        console.log("[GraphStorage] Rotating snapshot...");
+
+        await this.saveGraph(true);
+
+        this.resetGraph();
+
+        if (global.gc) {
+
+            global.gc();
+
+        }
+
     }
 
     updateWallet({
