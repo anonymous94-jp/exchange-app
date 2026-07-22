@@ -7,7 +7,7 @@ import graphBuilderService from "./services/graph/graphBuilderService.js";
 
 dotenv.config();
 
-const RAM_LIMIT_MB = 1000;
+const RAM_LIMIT_MB = 900;
 
 let rotating = false;
 

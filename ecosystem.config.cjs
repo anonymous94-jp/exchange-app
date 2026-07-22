@@ -11,7 +11,7 @@ module.exports = {
 
             watch: false,
 
-            max_memory_restart: "1200M"
+            max_memory_restart: "1100M"
         }
     ]
 };
