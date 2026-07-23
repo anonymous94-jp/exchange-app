@@ -35,6 +35,10 @@ const blockQueue = [];
 // Tránh chạy nhiều worker cùng lúc
 let processing = false;
 
+const RECEIPT_BATCH_SIZE = 10;
+
+const ERROR_SKIP_BLOCKS = 10;
+
 async function handleTransfer({
     blockNumber,
     blockTimestamp,
@@ -115,6 +119,12 @@ async function processQueue() {
 
         const blockNumber = blockQueue.shift();
 
+        console.log({
+            queue: blockQueue.length,
+            processing,
+            currentBlock: blockNumber
+        });
+
         try {
 
             const block =
@@ -130,10 +140,27 @@ async function processQueue() {
     		continue;
 	   }
 
-	  for (const txHash of block.transactions) {
+        for (
+            let i = 0;
+            i < block.transactions.length;
+            i += RECEIPT_BATCH_SIZE
+        ) {
 
-                const receipt =
-                    await provider.getTransactionReceipt(txHash);
+            const txBatch =
+                block.transactions.slice(
+                    i,
+                    i + RECEIPT_BATCH_SIZE
+                );
+
+            const receiptBatch =
+                await Promise.all(
+                    txBatch.map(txHash => getReceipt(txHash))
+                );
+
+            for (let j = 0; j < receiptBatch.length; j++) {
+
+                const receipt = receiptBatch[j];
+                const txHash = txBatch[j];
 
                 if (!receipt) {
                     continue;
@@ -153,65 +180,84 @@ async function processQueue() {
                         continue;
                     }
 
-                    // chống lỗi decode
                     if (!log.data || log.data.length < 66) {
                         continue;
                     }
+
                     let parsed;
+
                     try {
 
                         parsed =
                             erc20Interface.parseLog(log);
 
-                    } catch(err) {
-                        console.log("Skip invalid Transfer log",log.address);
-                        continue;
+                    } catch {
 
+                        console.log(
+                            "Skip invalid Transfer log",
+                            log.address
+                        );
+
+                        continue;
                     }
 
                     if (!parsed) {
                         continue;
                     }
+
                     await handleTransfer({
 
-                                blockNumber,
+                        blockNumber,
 
-                                blockTimestamp: Number(block.timestamp),
+                        blockTimestamp:
+                            Number(block.timestamp),
 
-                                txHash,
+                        txHash,
 
-                                log,
+                        log,
 
-                                parsed
+                        parsed
 
-                            });
+                    });
 
                 }
-        // await graphStorage.saveGraph(true);
-		printSummary();
 
-            } 
+            }
+
+            printSummary();
+
+        }
     } catch (error) {
 
-                const message =error?.error?.message || error?.message || "";
+             const message =error?.error?.message || error?.message || "";
 
-            // Chainstack Archive Error
+            // // Chainstack Archive Error
             if (
                 message.includes("Archive") ||
                 message.includes("-32002")
             ) {
 
+                console.error(
+                    `Block ${blockNumber} Error`,
+                    error.message
+                );
+
+                // bỏ qua thêm 5 block trong queue
+                for (
+                    let i = 0;
+                    i < ERROR_SKIP_BLOCKS &&
+                    blockQueue.length > 0;
+                    i++
+                ) {
+                    blockQueue.shift();
+                }
+
                 console.warn(
-                    `[Skip Archive Block] ${blockNumber}`
+                    `[Skip ${ERROR_SKIP_BLOCKS} blocks after error]`
                 );
 
                 continue;
             }
-
-            console.error(
-                `Block ${blockNumber} Error`,
-                message
-            );
 
             }
 
@@ -238,8 +284,59 @@ export async function startRealtimeCollector() {
 
         blockQueue.push(blockNumber);
 
+        console.log(
+            `[Receive] Block ${blockNumber} | Queue=${blockQueue.length}`
+        );
+
         processQueue();
 
     });
+
+}
+
+async function getReceipt(txHash) {
+
+    try {
+
+        return await provider.getTransactionReceipt(txHash);
+
+    } catch (err) {
+
+        const retry =
+            err?.error?.data?.try_again_in;
+
+        // Rate limit
+        if (retry) {
+
+            const retryMs =
+                Math.ceil(parseFloat(retry));
+
+            console.warn(
+                `[Receipt RPS] wait ${retryMs}ms`
+            );
+
+            await new Promise(resolve =>
+                setTimeout(resolve, retryMs)
+            );
+
+            try {
+
+                return await provider.getTransactionReceipt(txHash);
+
+            } catch {
+
+                return null;
+
+            }
+
+        }
+
+        console.warn(
+            `[Receipt Error] ${txHash}`
+        );
+
+        return null;
+
+    }
 
 }

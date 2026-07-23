@@ -19,7 +19,23 @@ class TokenMetadataService {
 
         this.provider = null;
 
+        this.pending = {};
+
+        this.dirty = false;
+
         this.load();
+
+        setInterval(() => {
+
+            if (!this.dirty) {
+                return;
+            }
+
+            this.save();
+
+            this.dirty = false;
+
+        }, 10000);
 
     }
 
@@ -70,6 +86,66 @@ class TokenMetadataService {
 
     }
 
+    // async getMetadata(tokenAddress) {
+
+    //     tokenAddress = tokenAddress.toLowerCase();
+
+    //     if (this.cache[tokenAddress]) {
+    //         return this.cache[tokenAddress];
+    //     }
+
+    //     if (!this.provider) {
+    //         throw new Error("Provider not set.");
+    //     }
+
+    //     const contract =
+    //         new Contract(
+    //             tokenAddress,
+    //             ERC20_ABI,
+    //             this.provider
+    //         );
+        
+    //     let symbol = "UNKNOWN";
+    //     let name = "UNKNOWN";
+    //     let decimals = 18;
+    //     try {
+    //         symbol = await contract.symbol();
+    //         name = await contract.name();
+    //         decimals = Number(await contract.decimals());
+    //     } catch (error) {
+    //         console.error(
+    //             `[Metadata Error] ${tokenAddress}`
+    //         );
+    //         console.dir(error, { depth: null });
+    //     }
+    //     // const [symbol, name, decimals] =
+    //     //     await Promise.all([
+    //     //         contract.symbol(),
+    //     //         contract.name(),
+    //     //         contract.decimals()
+    //     //     ]);
+
+    //     const metadata = {
+
+    //         address: tokenAddress,
+
+    //         symbol,
+
+    //         name,
+
+    //         decimals: Number(decimals)
+
+    //     };
+
+    //     this.cache[tokenAddress] = metadata;
+
+    //     this.save();
+
+    //     return metadata;
+
+    // }
+
+    // refactored
     async getMetadata(tokenAddress) {
 
         tokenAddress = tokenAddress.toLowerCase();
@@ -78,41 +154,76 @@ class TokenMetadataService {
             return this.cache[tokenAddress];
         }
 
+        if (this.pending[tokenAddress]) {
+            return await this.pending[tokenAddress];
+        }
+
         if (!this.provider) {
             throw new Error("Provider not set.");
         }
 
-        const contract =
-            new Contract(
-                tokenAddress,
-                ERC20_ABI,
-                this.provider
-            );
+        this.pending[tokenAddress] =
+            (async () => {
 
-        const [symbol, name, decimals] =
-            await Promise.all([
-                contract.symbol(),
-                contract.name(),
-                contract.decimals()
-            ]);
+                const contract =
+                    new Contract(
+                        tokenAddress,
+                        ERC20_ABI,
+                        this.provider
+                    );
 
-        const metadata = {
+                let symbol = "UNKNOWN";
+                let name = "UNKNOWN";
+                let decimals = 18;
 
-            address: tokenAddress,
+                try {
 
-            symbol,
+                    symbol = await contract.symbol();
 
-            name,
+                } catch {}
 
-            decimals: Number(decimals)
+                try {
 
-        };
+                    name = await contract.name();
 
-        this.cache[tokenAddress] = metadata;
+                } catch {}
 
-        this.save();
+                try {
 
-        return metadata;
+                    decimals =
+                        Number(await contract.decimals());
+
+                } catch {}
+
+                const metadata = {
+
+                    address: tokenAddress,
+
+                    symbol,
+
+                    name,
+
+                    decimals
+
+                };
+
+                this.cache[tokenAddress] = metadata;
+
+                this.dirty = true;
+
+                return metadata;
+
+            })();
+
+        try {
+
+            return await this.pending[tokenAddress];
+
+        } finally {
+
+            delete this.pending[tokenAddress];
+
+        }
 
     }
 
