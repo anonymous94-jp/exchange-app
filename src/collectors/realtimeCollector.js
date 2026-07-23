@@ -193,10 +193,25 @@ async function processQueue() {
             } 
     } catch (error) {
 
-                console.error(
-                    `Block ${blockNumber} Error`,
-                    error.message
+                const message =error?.error?.message || error?.message || "";
+
+            // Chainstack Archive Error
+            if (
+                message.includes("Archive") ||
+                message.includes("-32002")
+            ) {
+
+                console.warn(
+                    `[Skip Archive Block] ${blockNumber}`
                 );
+
+                continue;
+            }
+
+            console.error(
+                `Block ${blockNumber} Error`,
+                message
+            );
 
             }
 
