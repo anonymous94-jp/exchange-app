@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 
-import { startRealtimeCollector } from "./collectors/realtimeCollector.js";
+import { startRealtimeCollector } from "./collectors/realtimeLogCollector.js";
 import graphStorage from "./services/graph/graphStorageService.js";
 import { getMemoryInfo } from "./utils/memoryMonitor.js";
 import graphBuilderService from "./services/graph/graphBuilderService.js";

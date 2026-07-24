@@ -7,7 +7,13 @@ module.exports = {
 
             script: "./src/index.js",
 
-            autorestart: false,
+            autorestart: true,
+
+            max_restarts: 100,
+
+            min_uptime: "10s",
+
+            restart_delay: 5000,
 
             watch: false,
 

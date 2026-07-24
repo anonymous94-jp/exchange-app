@@ -85,9 +85,6 @@ class GraphStorageService {
 
             await fs.ensureDir(path.dirname(SNAPSHOT_DIR));
 
-            // await fs.writeJson(GRAPH_PATH, this.graph, {
-            //     spaces: 2
-            // });
             await fs.writeJson(this.currentGraphPath, this.graph, {
                 spaces: 2
             });
@@ -301,9 +298,9 @@ class GraphStorageService {
 
         tokenFlow.amountRaw =
         (
-            BigInt(tokenFlow.amountRaw)
+            Number(tokenFlow.amountRaw)
             +
-            BigInt(amount)
+            Number(amount)
         ).toString();
 
 
@@ -314,14 +311,11 @@ class GraphStorageService {
         tokenFlow.volumeUsd +=
             Number(usdValue);
 
-
         tokenFlow.lastSeen =
             timestamp;
 
 
         edge.stats.count++;
-
-        // edge.stats.totalAmount += Number(amount);
 
         edge.stats.totalUsd += Number(usdValue);
 
@@ -543,7 +537,7 @@ class GraphStorageService {
     updateSender(
     wallet,
     sender,
-    usdValue
+    usdValue =0
     ) {
 
 
@@ -594,7 +588,7 @@ class GraphStorageService {
     updateReceiver(
     wallet,
     receiver,
-    usdValue
+    usdValue = 0
     ) {
 
 
